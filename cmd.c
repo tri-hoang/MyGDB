@@ -29,7 +29,11 @@ int cmd_run(mygdb_t *mygdb) {
 	if (mygdb->child) { // PARENT
 		waitpid(mygdb->child, NULL, 0);
 		cmdh_bp_enable(mygdb);
-		ptrace(PTRACE_CONT, mygdb->child, NULL, NULL);
+		int i;
+		if ((i = mygdb->bps_active) != -1) {
+			printf("At breakpoint #%d (%x) on line %d\n", i, mygdb->bps[i].addr, mygdb->bps[i].line);
+		}			
+		ptrace(PTRACE_CONT, mygdb->child, NULL, NULL);		
 
 	} else { // CHILD
 		if (ptrace(PTRACE_TRACEME, 0, NULL, NULL) < 0) {
@@ -57,14 +61,8 @@ int cmd_continue(mygdb_t *mygdb) {
 
 	regs.rip = regs.rip - 1;
 
-	int i;
-	for (i = 0; i < mygdb->bps_enabled; i++) {
-		if (regs.rip == mygdb->bps[i].addr) {
-			mygdb->bps_active = i;
-			break;
-		}
-	}
-
+	cmdh_get_breakpoint(mygdb);
+	
 	if (ptrace(PTRACE_SETREGS, mygdb->child, NULL, &regs) < 0) {
 		printf("Failed to set child register values.\n%s\n", strerror(errno));
 		return 0;
@@ -77,10 +75,11 @@ int cmd_continue(mygdb_t *mygdb) {
 		return 0;	
 	}
 
-	waitpid(mygdb->child, &status, 0);
+	waitpid(mygdb->child, &status, 0);	
 
-	if (WIFEXITED(status)) {
+	if (WIFEXITED(status) || WIFSIGNALED(status)) {
 		mygdb->child = -1;
+		mygdb->bps_enabled = -1;
 		return 1;
 	}
 
@@ -100,7 +99,6 @@ int cmd_break(mygdb_t *mygdb, int line_num) {
 		return 1;
 	}
 
-	printf("MALLOC START\n");
 	if (mygdb->bps_count == -1) {
 		mygdb->bps = malloc(sizeof(bp_t));
 		mygdb->bps_count = 0;
@@ -108,7 +106,6 @@ int cmd_break(mygdb_t *mygdb, int line_num) {
 		mygdb->bps = realloc(mygdb->bps, (mygdb->bps_count + 1) * sizeof(bp_t));
 		mygdb->bps_count += 1;
 	}
-	printf("MALLOC END\n");
 
 	bp_t bp;
 	bp.line = line_num;

@@ -6,11 +6,13 @@
 #define ARGS_NUM 	2
 #define ARGS_DELIM 	" \n"
 
-#define EXEC_FILE 		"file"
-#define EXEC_RUN  		"run"
-#define EXEC_QUIT 		"quit"
-#define EXEC_BREAK 		"break"
+#define EXEC_FILE		"file"
+#define EXEC_RUN		"run"
+#define EXEC_QUIT		"quit"
+#define EXEC_BREAK		"break"
 #define EXEC_CONTINUE 	"continue"
+#define EXEC_PRINT		"print"
+
 
 char *mygdb_read_line();
 char **mygdb_parse_args(char *, int *);
@@ -25,6 +27,7 @@ int main(int argc, char const *argv[])
 	mygdb.bps_enabled = -1;
 	mygdb.bps_count = -1;
 	mygdb.child = -1;
+	mygdb.bps_active = -1;
 
 	do {
 		printf("(mygdb) ");
@@ -33,6 +36,23 @@ int main(int argc, char const *argv[])
 		args = mygdb_parse_args(line, &args_count);
 		status = mygdb_execute(&mygdb, args, args_count);
 
+		int stat;
+		if (mygdb.child != -1) {
+			waitpid(mygdb.child, &stat, 0);
+			if (WIFEXITED(stat)) {
+				mygdb.child = -1;
+				mygdb.bps_enabled = -1;
+				printf("Program ended.\n");
+				continue;
+			}
+
+			cmdh_get_breakpoint(&mygdb);
+
+			if (mygdb.bps_active != -1) {
+				int ii = mygdb.bps_active;
+				printf("At breakpoint #%d (%x) on line %d\n", ii, mygdb.bps[ii].addr, mygdb.bps[ii].line);
+			}	
+		}
 		free(line);
 		free(args);
 	} while (status);
