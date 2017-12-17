@@ -6,28 +6,19 @@
 #define ARGS_NUM 	2
 #define ARGS_DELIM 	" \n"
 
-#define EXEC_FILE		"file"
-#define EXEC_RUN		"run"
-#define EXEC_QUIT		"quit"
-#define EXEC_BREAK		"break"
-#define EXEC_CONTINUE 	"continue"
-#define EXEC_PRINT		"print"
-
-
 char *mygdb_read_line();
 char **mygdb_parse_args(char *, int *);
 int mygdb_execute(mygdb_t *, char **, int);
+void mygdb_init(mygdb_t *);
 
 int main(int argc, char const *argv[])
 {
 	char *line;
 	char **args;
-	int status = 1, args_count, i;
+	int args_count, i;
+	cmd_t status = CMD_GO;
 	mygdb_t mygdb;
-	mygdb.bps_enabled = -1;
-	mygdb.bps_count = -1;
-	mygdb.child = -1;
-	mygdb.bps_active = -1;
+	mygdb_init(&mygdb);
 
 	do {
 		printf("(mygdb) ");
@@ -37,9 +28,11 @@ int main(int argc, char const *argv[])
 		status = mygdb_execute(&mygdb, args, args_count);
 
 		int stat;
-		if (mygdb.child != -1) {
+		if (mygdb.child != -1 && (status == CMD_RUN || status == CMD_CONTINUE)) {
+			// printf("HERE 2\n");
 			waitpid(mygdb.child, &stat, 0);
-			if (WIFEXITED(stat)) {
+			// printf("HERE 3\n");
+			if (WIFEXITED(stat) || WIFSIGNALED(stat)) {
 				mygdb.child = -1;
 				mygdb.bps_enabled = -1;
 				printf("Program ended.\n");
@@ -50,8 +43,9 @@ int main(int argc, char const *argv[])
 
 			if (mygdb.bps_active != -1) {
 				int ii = mygdb.bps_active;
-				printf("At breakpoint #%d (%x) on line %d\n", ii, mygdb.bps[ii].addr, mygdb.bps[ii].line);
-			}	
+				printf("Stopped breakpoint #%d (%x) on line %d\n", ii, mygdb.bps[ii].addr, mygdb.bps[ii].line);
+			}
+			// printf("HERE 1\n");
 		}
 		free(line);
 		free(args);
@@ -130,3 +124,11 @@ int mygdb_execute_check(mygdb_t *mygdb) {
 		return 1;
 	} else return 0;
 } 
+
+void mygdb_init(mygdb_t *mygdb) {
+	mygdb->bps_enabled = -1;
+	mygdb->bps_count = -1;
+	mygdb->child = -1;
+	mygdb->bps_active = -1;
+	return;
+}

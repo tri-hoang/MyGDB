@@ -41,6 +41,7 @@ int cmdh_bp_addr(mygdb_t *mygdb, int line_num, Dwarf_Addr *addr) {
 	}
 
 	for (i = 0; i < count; i++) {
+		printf("%s\n", l_buff[i]);
 		if (dwarf_lineno(l_buff[i], &l_num, &error) == DW_DLV_ERROR) {
 			printf("Failed at dwarf_lineno() in cmd_helper.c\n%s\n", strerror(errno));
 			return 0;
@@ -57,10 +58,10 @@ int cmdh_bp_addr(mygdb_t *mygdb, int line_num, Dwarf_Addr *addr) {
 
 int cmdh_bp_enable(mygdb_t *mygdb) {
 	// printf("ENABLING %d %d\n", mygdb->bps_enabled, mygdb->bps_count);	
-	if (mygdb->bps_enabled == mygdb->bps_count) return 1;
+	if (mygdb->bps_enabled == mygdb->bps_count) return CMD_GO;
 	if (mygdb->bps_enabled == -1) mygdb->bps_enabled = 0;
 	// printf("ENABLING %d %d\n", mygdb->bps_enabled, mygdb->bps_count);
-	for (; mygdb->bps_enabled <= mygdb->bps_count; mygdb->bps_enabled++) {
+	for (; mygdb->bps_enabled < mygdb->bps_count; mygdb->bps_enabled++) {
 		// printf("%d\n", mygdb->bps_enabled);
 		int i = mygdb->bps_enabled;
 		mygdb->bps[i].original = ptrace(PTRACE_PEEKTEXT, mygdb->child, (void *) mygdb->bps[i].addr, 0);

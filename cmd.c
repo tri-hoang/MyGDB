@@ -1,6 +1,6 @@
 #include "cmd.h"
 
-int cmd_file(mygdb_t *mygdb, char *file) {
+cmd_t cmd_file(mygdb_t *mygdb, char *file) {
 	if (access(file, F_OK | R_OK | X_OK)) {
 		printf("Can't use file: %s\nError: %s\n", file, strerror(errno));
 		return 1;
@@ -17,10 +17,18 @@ int cmd_file(mygdb_t *mygdb, char *file) {
 		return 0;
 
 	printf("Reading symbols from %s...done.\n", file);
-	return 1;
+	return CMD_FILE;
 }
 
-int cmd_run(mygdb_t *mygdb) {
+cmd_t cmd_run(mygdb_t *mygdb) {
+	// If "run" is called when a child is running, kill the child and reset control values.
+	if (mygdb->child != -1) {
+		kill(mygdb->child, SIGTERM);
+		mygdb->child = -1;
+		mygdb->bps_active = -1;
+		mygdb->bps_enabled = -1;
+	}
+
 	if ((mygdb->child = fork()) == -1) {
 		printf("Can't fork %s\n", strerror(errno));
 		return 0;
@@ -28,11 +36,7 @@ int cmd_run(mygdb_t *mygdb) {
 
 	if (mygdb->child) { // PARENT
 		waitpid(mygdb->child, NULL, 0);
-		cmdh_bp_enable(mygdb);
-		int i;
-		if ((i = mygdb->bps_active) != -1) {
-			printf("At breakpoint #%d (%x) on line %d\n", i, mygdb->bps[i].addr, mygdb->bps[i].line);
-		}			
+		cmdh_bp_enable(mygdb);		
 		ptrace(PTRACE_CONT, mygdb->child, NULL, NULL);		
 
 	} else { // CHILD
@@ -47,10 +51,10 @@ int cmd_run(mygdb_t *mygdb) {
 			return 0;
 		}
 	}
-	return 1;
+	return CMD_RUN;
 }
 
-int cmd_continue(mygdb_t *mygdb) {
+cmd_t cmd_continue(mygdb_t *mygdb) {
 	int status;
 	struct user_regs_struct regs;
 
@@ -62,7 +66,7 @@ int cmd_continue(mygdb_t *mygdb) {
 	regs.rip = regs.rip - 1;
 
 	cmdh_get_breakpoint(mygdb);
-	
+
 	if (ptrace(PTRACE_SETREGS, mygdb->child, NULL, &regs) < 0) {
 		printf("Failed to set child register values.\n%s\n", strerror(errno));
 		return 0;
@@ -89,10 +93,10 @@ int cmd_continue(mygdb_t *mygdb) {
 		return 0;
 	}
 
-	return 1;
+	return CMD_CONTINUE;
 }
 
-int cmd_break(mygdb_t *mygdb, int line_num) {
+cmd_t cmd_break(mygdb_t *mygdb, int line_num) {
 	Dwarf_Addr addr;
 	if (cmdh_bp_addr(mygdb, line_num, &addr) != 1) {
 		printf("Can't get address of this line %d\n", line_num);
@@ -100,22 +104,39 @@ int cmd_break(mygdb_t *mygdb, int line_num) {
 	}
 
 	if (mygdb->bps_count == -1) {
+		mygdb->bps_count = 1;
 		mygdb->bps = malloc(sizeof(bp_t));
-		mygdb->bps_count = 0;
 	} else {
-		mygdb->bps = realloc(mygdb->bps, (mygdb->bps_count + 1) * sizeof(bp_t));
 		mygdb->bps_count += 1;
+		mygdb->bps = realloc(mygdb->bps, (mygdb->bps_count) * sizeof(bp_t));
 	}
 
 	bp_t bp;
 	bp.line = line_num;
 	bp.addr = addr;
 
-	mygdb->bps[mygdb->bps_count] = bp;
-
-	return 1;
+	mygdb->bps[mygdb->bps_count - 1] = bp;
+	printf("BROKE\n");
+	return CMD_BREAK;
 }
 
-int cmd_quit() {
-	return 1;
+cmd_t cmd_quit() {
+	return CMD_QUIT;
+}
+
+cmd_t cmd_print(mygdb_t *mygdb, char *var) {
+	Dwarf_Half tag;
+	Dwarf_Error err;
+	Dwarf_Die die;
+	Dwarf_Die die_child;
+
+	if (dwarf_tag(die, &tag, &err)) {
+		printf("dwarf_tag() error in cmd.c\n%s\n", strerror(errno));
+		return CMD_END;
+	}
+
+	// if (tag != DW_TAG)
+
+	// if (dwarf_tag(die, ))
+	return CMD_PRINT;
 }
