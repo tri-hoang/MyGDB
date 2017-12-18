@@ -130,13 +130,48 @@ cmd_t cmd_print(mygdb_t *mygdb, char *var) {
 	Dwarf_Die die;
 	Dwarf_Die die_child;
 
-	if (dwarf_tag(die, &tag, &err)) {
+	if (cmdh_var_func(mygdb, &die) == RE_FATAL) {
+		printf("Couldn't execute cmdh_var_func() in cmd.c\n");
+		return CMD_END;
+	}
+
+	printf("CMD_PRINT\n");
+	if (dwarf_tag(die, &tag, &err) != DW_DLV_OK) {
 		printf("dwarf_tag() error in cmd.c\n%s\n", strerror(errno));
 		return CMD_END;
 	}
 
-	// if (tag != DW_TAG)
+	if (tag != DW_TAG_subprogram) {
+		printf("Only need to view subprogram DIE.\n");
+		return CMD_GO;
+	}
 
-	// if (dwarf_tag(die, ))
-	return CMD_PRINT;
+	if (dwarf_child(die, &die_child, &err) == DW_DLV_ERROR) {
+		printf("dwarf_child() error in cmd.c\n%s\n", strerror(errno));
+		return CMD_END;
+	}
+
+
+	while (1) {
+		int rc, found = 0;
+
+		if (cmdh_var_check(die_child, var, &found) == RE_FATAL) {
+			printf("cmdh_var_check() error in cmd.c\n");
+			return CMD_END;
+		}
+
+		if (found) {
+			return cmdh_var_print(mygdb, die_child, var);
+		}
+
+		if ((rc = dwarf_siblingof(mygdb->debug, die_child, &die_child, &err)) == DW_DLV_ERROR) {
+			printf("Error at dwarf_siblingof() in cmd.c\n%s\n", strerror(errno));
+			return CMD_END;
+		} else if (rc == DW_DLV_NO_ENTRY) {
+			printf("Couldn't find the variable.\n");
+			return CMD_GO;
+		}
+
+	}
+	return CMD_END;
 }

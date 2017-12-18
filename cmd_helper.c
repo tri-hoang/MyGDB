@@ -114,3 +114,214 @@ int cmdh_get_breakpoint(mygdb_t *mygdb) {
 		}
 	}
 }
+
+int cmdh_var_func(mygdb_t *mygdb, Dwarf_Die *die) {
+	Dwarf_Error err;
+	Dwarf_Die abc;
+
+	if (dwarf_child(mygdb->cu_die, die, &err) != DW_DLV_OK) {
+		printf("Error at dwarf_child in cmd_helper.c@cmdh_var_func\n%s\n", strerror(errno));
+		return RE_FATAL;
+	}
+
+
+	struct user_regs_struct regs;
+	if (ptrace(PTRACE_GETREGS, mygdb->child, NULL, &regs) < 0) {
+		printf("Error at ptrace getregs in cmd_helper.c@cmdh_var_func\n%s\n", strerror(errno));
+		return RE_FATAL;
+	}
+	int i = 0;
+	while (1) {
+		printf("%d\n", i++);
+		int rc, found = 0;
+		if (cmdh_var_func_check(*die, regs.rip - 1, &found) == RE_FATAL) {
+			printf("Error at cmdh_var_func_check in cmd_helper.c@cmdh_var_func\n");
+			return RE_FATAL;
+		}
+
+		if (found) {
+			return RE_OK;
+		}
+
+		// printf("SIB:%d %d %d\n", mygdb->debug == NULL, die == NULL, die == NULL);
+		rc = dwarf_siblingof(mygdb->debug, mygdb->cu_die, die, &err);
+		if (rc == DW_DLV_ERROR) {
+			printf("%s\n", dwarf_errmsg(err));
+			printf("Error at dwarf_siblingof 2 in cmd_helper.c@cmdh_var_func\n%s\n", strerror(errno));
+			return RE_FATAL;
+		} else if (rc == DW_DLV_NO_ENTRY) {
+			return RE_NON_FATAL;
+		}
+	}
+
+	return RE_FATAL;
+}
+
+int cmdh_var_func_check(Dwarf_Die die, int rip, int *found) {
+	char *die_name = 0;
+	Dwarf_Half tag;
+	Dwarf_Attribute *attrs;
+	Dwarf_Addr lowpc, highpc;
+	Dwarf_Signed attrcount, i;
+	Dwarf_Error err;
+	int rc;
+	if ((rc = dwarf_diename(die, &die_name, &err)) != DW_DLV_OK) {
+		printf("Failed at dwarf_diename in cmd_helper.c@cmdh_var_func_check\n%s\n", strerror(errno));
+		return RE_FATAL;
+	} else if (rc == DW_DLV_NO_ENTRY) {
+		printf("Can't find any entry in cmd_helper.c@cmdh_var_func_check\n");
+		return RE_NON_FATAL;
+	}
+
+	if (dwarf_tag(die, &tag, &err) != DW_DLV_OK) {
+		printf("Failed at dwarf_tag in cmd_helper.c@cmdh_var_func_check\n");
+		return RE_FATAL;
+	}
+
+	if (tag != DW_TAG_subprogram) {
+		return RE_NON_FATAL;
+	}
+
+	if (dwarf_attrlist(die, &attrs, &attrcount, &err) != DW_DLV_OK) {
+		printf("Failed at dwarf_attrlist in cmd_helper.c@cmdh_var_func_check\n%s\n", strerror(errno));
+		return RE_FATAL;
+	}
+
+	for (i = 0; i < attrcount; ++i) {
+		Dwarf_Half attrcode;
+		if (dwarf_whatattr(attrs[i], &attrcode, &err) != DW_DLV_OK) {
+			printf("Failed at dwarf_whatattr in cmd_helper.c@cmdh_var_func_check\n%s\n", strerror(errno));
+			return RE_FATAL;
+		}
+
+		if (attrcode == DW_AT_low_pc) {
+			if (dwarf_formaddr(attrs[i], &lowpc, 0) != DW_DLV_OK) {
+				printf("Failed at dwarf_formaddr lowpc in cmd_helper.c@cmdh_var_func_check\n");
+				return RE_FATAL;
+			}
+		}
+		else if (attrcode == DW_AT_high_pc) {
+			if (dwarf_formaddr(attrs[i], &highpc, 0) != DW_DLV_OK) {
+				printf("Failed at dwarf_formaddr highpc in cmd_helper.c@cmdh_var_func_check\n");
+				return RE_FATAL;
+			}
+		}
+	}
+
+	if (rip >= lowpc && rip <= highpc)
+		*found = 1;
+
+	return RE_OK;
+}
+
+int cmdh_var_check(Dwarf_Die die, char * var, int * found) {
+	char* die_name = 0;
+	Dwarf_Half tag;
+	Dwarf_Attribute *attrs;
+	Dwarf_Signed attrcount, i;
+	Dwarf_Error err;
+	int rc;
+	if ((rc = dwarf_diename(die, &die_name, &err)) == DW_DLV_ERROR) {
+		printf("Error at dwarf_diename() in cmd_helper.c@cmdh_var_check\n%s\n", strerror(errno));
+		printf("%s\n", dwarf_errmsg(err));
+		return RE_FATAL;
+	} else if (rc == DW_DLV_NO_ENTRY) return RE_NON_FATAL;
+
+	if (dwarf_tag(die, &tag, &err) != DW_DLV_OK) {
+		printf("Error at dwarf_tag() in cmd_helper.c@cmdh_var_check\n%s\n", strerror(errno));
+		printf("%s\n", dwarf_errmsg(err));
+		return RE_FATAL;
+	}
+
+	if (tag != DW_TAG_variable) {
+		printf("cmd_helper.c@cmdh_var_check: Isn't variable.\n");
+		return RE_NON_FATAL;
+	}
+
+	if (dwarf_attrlist(die, &attrs, &attrcount, &err) != DW_DLV_OK) {
+		printf("Error at dwarf_attrlist() in cmd_helper.c@cmdh_var_check\n%s\n", strerror(errno));
+		printf("%s\n", dwarf_errmsg(err));
+		return RE_FATAL;
+	}
+
+	for (i = 0; i < attrcount; ++i) {
+		char *var_name;
+		if (dwarf_formstring(attrs[i], &var_name, &err) != DW_DLV_OK) {
+			printf("Error at dwarf_formstring() in cmd_helper.c@cmdh_var_check\n%s\n", strerror(errno));
+			printf("%s\n", dwarf_errmsg(err));
+			return RE_FATAL;
+		}
+		if (strcmp(var_name, var) == 0) {
+			*found = 1;
+			return RE_OK;
+		}
+	}
+	return 1;
+}
+
+int cmdh_var_print(mygdb_t *mygdb, Dwarf_Die die, char *var) {
+	Dwarf_Half tag;
+	Dwarf_Attribute *attrs;
+	Dwarf_Locdesc *locs;
+	Dwarf_Signed attrcount, i, count;
+	Dwarf_Error err;
+	unsigned long addr;
+
+	if (dwarf_tag(die, &tag, &err) != DW_DLV_OK) {
+		printf("Error at dwarf_tag() in cmd_helper.c@cmdh_var_print\n%s\n", strerror(errno));
+		return RE_FATAL;
+	}
+
+	if (tag != DW_TAG_variable) {
+		printf("cmd_helper.c@cmdh_var_print: Isn't variable.\n");
+		return RE_FATAL;
+	}
+
+	if (dwarf_attrlist(die, &attrs, &attrcount, &err) != DW_DLV_OK) {
+		printf("Error at dwarf_attrlist() in cmd_helper.c@cmdh_var_print\n%s\n", strerror(errno));
+		return RE_FATAL;
+	}
+
+	for (i = 0; i < attrcount; ++i) {
+		Dwarf_Half attrcode;
+		if (dwarf_whatattr(attrs[i], &attrcode, &err) != DW_DLV_OK) {
+			printf("Error at dwarf_whatattr() in cmd_helper.c@cmdh_var_print\n%s\n", strerror(errno));
+			return RE_FATAL;
+		}
+
+		if (attrcode == DW_AT_location) break;
+	}
+
+	if (attrs[i] == NULL) {
+		printf("Couldn't find DW_AT_location.\n");
+		return RE_NON_FATAL;
+	}
+
+	if (dwarf_loclist(attrs[i], &locs, &count, &err) != DW_DLV_OK) {
+			printf("Error at dwarf_loclist() in cmd_helper.c@cmdh_var_print\n%s\n", strerror(errno));
+			return RE_FATAL;
+	}
+
+	if ((count != 1) || (locs[0].ld_cents != 1) || (locs[0].ld_s[0].lr_atom != DW_OP_fbreg)) {
+		printf("Couldn't find the correct information.\n");
+		return RE_FATAL;
+	}
+
+	struct user_regs_struct regs;
+	if (ptrace(PTRACE_GETREGS, mygdb->child, NULL, &regs) < 0) {
+		printf("Failed to get registers in cmd_helper.c@cmdh_var_print\n%s\n", strerror(errno));
+		return RE_FATAL;
+	}
+
+	addr = (unsigned long) (regs.rbp + (long) locs[0].ld_s[0].lr_number + 16);
+
+	unsigned long data;
+	if ((data = ptrace(PTRACE_PEEKTEXT, mygdb->child, (void *) addr)) < 0) {
+		printf("Failed to peek text in cmd_helper.c@cmdh_var_print\n%s\n", strerror(errno));
+		return RE_FATAL;
+	}
+
+	printf("%s = %ld\n", var, data);
+
+	return RE_OK;
+}

@@ -50,7 +50,7 @@ typedef enum {
 } cmd_t;
 
 typedef enum {
-	R_FATAL,
-	R_OK,
-	R_NON_FATAL
+	RE_FATAL,
+	RE_OK,
+	RE_NON_FATAL
 } return_t;
