@@ -1,9 +1,11 @@
+CFLAGS=-gdwarf-2 -g -I/usr/include/libdwarf
+
 .PHONY: all clean
 
 all: mygdb test
 
 mygdb: mygdb.c cmd.c cmd_helper.c
-	gcc mygdb.c cmd.c cmd_helper.c -o mygdb -ldwarf -I/usr/include/libdwarf -g
+	gcc $(CFLAGS) mygdb.c cmd.c cmd_helper.c -ldwarf -lelf -o mygdb
 
 test: test.c
 	gcc test.c -o test -g

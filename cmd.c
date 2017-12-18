@@ -116,7 +116,7 @@ cmd_t cmd_break(mygdb_t *mygdb, int line_num) {
 	bp.addr = addr;
 
 	mygdb->bps[mygdb->bps_count - 1] = bp;
-	printf("BROKE\n");
+
 	return CMD_BREAK;
 }
 
@@ -137,7 +137,7 @@ cmd_t cmd_print(mygdb_t *mygdb, char *var) {
 
 	printf("CMD_PRINT\n");
 	if (dwarf_tag(die, &tag, &err) != DW_DLV_OK) {
-		printf("dwarf_tag() error in cmd.c\n%s\n", strerror(errno));
+		printf("dwarf_tag() error in cmd.c\n%s\n", dwarf_errmsg(err));
 		return CMD_END;
 	}
 
@@ -147,7 +147,7 @@ cmd_t cmd_print(mygdb_t *mygdb, char *var) {
 	}
 
 	if (dwarf_child(die, &die_child, &err) == DW_DLV_ERROR) {
-		printf("dwarf_child() error in cmd.c\n%s\n", strerror(errno));
+		printf("dwarf_child() error in cmd.c\n%s\n", dwarf_errmsg(err));
 		return CMD_END;
 	}
 
@@ -164,8 +164,8 @@ cmd_t cmd_print(mygdb_t *mygdb, char *var) {
 			return cmdh_var_print(mygdb, die_child, var);
 		}
 
-		if ((rc = dwarf_siblingof(mygdb->debug, die_child, &die_child, &err)) == DW_DLV_ERROR) {
-			printf("Error at dwarf_siblingof() in cmd.c\n%s\n", strerror(errno));
+		if ((rc = dwarf_siblingof(mygdb->t_dbg, die_child, &die_child, &err)) == DW_DLV_ERROR) {
+			printf("Error at dwarf_siblingof() in cmd.c\n%s\n", dwarf_errmsg(err));
 			return CMD_END;
 		} else if (rc == DW_DLV_NO_ENTRY) {
 			printf("Couldn't find the variable.\n");

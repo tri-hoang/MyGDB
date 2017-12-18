@@ -29,6 +29,7 @@ typedef struct {
 typedef struct {
 	char *file;
 	int fd;
+	Dwarf_Debug t_dbg;
 	Dwarf_Debug debug;
 	Dwarf_Die cu_die;
 	pid_t child;
