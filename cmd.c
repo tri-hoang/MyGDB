@@ -141,6 +141,7 @@ cmd_t cmd_print(mygdb_t *mygdb, char *var) {
 	Dwarf_Die fun_die;
 	Dwarf_Die var_die;
 	struct user_regs_struct regs;
+	int ret;
 
 	if (ptrace(PTRACE_GETREGS, mygdb->child, NULL, &regs) < 0) {
 		printf("Error at ptrace getregs in cmd.c@cmd_print\n%s\n", strerror(errno));
@@ -151,17 +152,19 @@ cmd_t cmd_print(mygdb_t *mygdb, char *var) {
 		printf("Can't execute cmdh_print_getFunc in cmd.c@cmd_print\n");
 		return CMD_END;
 	}
+	if (ret == RE_NON_FATAL) return CMD_GO;
 
-	if (cmdh_print_getVar(mygdb, fun_die, &var_die, var) == RE_FATAL) {
+	if ((ret = cmdh_print_getVar(mygdb, fun_die, &var_die, var) == RE_FATAL)) {
 		printf("Can't execute cmdh_print_getVar in cmd.c@cmd_print_\n");
 		return CMD_END;
 	}
+	if (ret == RE_NON_FATAL) return CMD_GO;
 
 	if (cmdh_print_printVar(mygdb, var_die, var) == RE_FATAL) {
 		printf("Can't execute cmdh_print_varPrint in cmd.c@cmd_print\n");
 		return CMD_END;
 	}
+	if (ret == RE_NON_FATAL) return CMD_GO;
 
 	return CMD_GO;
-
 }

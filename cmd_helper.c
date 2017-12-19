@@ -299,25 +299,26 @@ int cmdh_print_printVar(mygdb_t *mygdb, Dwarf_Die die, char *var) {
 	Dwarf_Error err;
 	unsigned long addr;
 
+	if (die == NULL) return RE_NON_FATAL;
 	if (dwarf_tag(die, &tag, &err) != DW_DLV_OK) {
-		printf("Error at dwarf_tag() in cmd_helper.c@cmdh_var_print\n%s\n", dwarf_errmsg(err));
+		printf("Error at dwarf_tag() in cmd_helper.c@cmdh_print_printVar\n%s\n", dwarf_errmsg(err));
 		return RE_FATAL;
 	}
 
 	if (tag != DW_TAG_variable) {
-		printf("cmd_helper.c@cmdh_var_print: Isn't variable.\n");
+		printf("cmd_helper.c@cmdh_print_printVar: Isn't variable.\n");
 		return RE_FATAL;
 	}
 
 	if (dwarf_attrlist(die, &attrs, &attrcount, &err) != DW_DLV_OK) {
-		printf("Error at dwarf_attrlist() in cmd_helper.c@cmdh_var_print\n%s\n", dwarf_errmsg(err));
+		printf("Error at dwarf_attrlist() in cmd_helper.c@cmdh_print_printVar\n%s\n", dwarf_errmsg(err));
 		return RE_FATAL;
 	}
 
 	for (i = 0; i < attrcount; ++i) {
 		Dwarf_Half attrcode;
 		if (dwarf_whatattr(attrs[i], &attrcode, &err) != DW_DLV_OK) {
-			printf("Error at dwarf_whatattr() in cmd_helper.c@cmdh_var_print\n%s\n", dwarf_errmsg(err));
+			printf("Error at dwarf_whatattr() in cmd_helper.c@cmdh_print_printVar\n%s\n", dwarf_errmsg(err));
 			return RE_FATAL;
 		}
 
@@ -347,7 +348,7 @@ int cmdh_print_printVar(mygdb_t *mygdb, Dwarf_Die die, char *var) {
 
 	addr = (unsigned long) (regs.rbp + (long) locs[0].ld_s[0].lr_number + 16);
 
-	unsigned long data;
+	long data;
 	if ((data = ptrace(PTRACE_PEEKTEXT, mygdb->child, (void *) addr)) < 0) {
 		printf("Failed to peek text in cmd_helper.c@cmdh_var_print\n%s\n", dwarf_errmsg(err));
 		return RE_FATAL;

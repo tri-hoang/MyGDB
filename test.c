@@ -3,12 +3,12 @@
 void printt();
 void main(int argc, char const *argv[])
 {
-	long test = 100;
+	long test = 2147483647;
+	int i;
 	fprintf(stdout, "TEST1\n");
 	fprintf(stdout, "TEST2\n");
 	fprintf(stdout, "TEST3\n");
 	printt();
-
 }
 
 void printt() {
