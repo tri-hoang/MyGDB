@@ -1,5 +1,6 @@
 #include "cmd.h"
 
+// Load file DWARF values
 cmd_t cmd_file(mygdb_t *mygdb, char *file) {
 	if (access(file, F_OK | R_OK | X_OK)) {
 		printf("Can't use file: %s\nError: %s\n", file, strerror(errno));
@@ -20,6 +21,8 @@ cmd_t cmd_file(mygdb_t *mygdb, char *file) {
 	return CMD_FILE;
 }
 
+// Kill the child process if one is alreayd running
+// Otherwise set it up and enable breakpoints
 cmd_t cmd_run(mygdb_t *mygdb) {
 	// If "run" is called when a child is running, kill the child and reset control values.
 	if (mygdb->child != -1) {
@@ -54,6 +57,7 @@ cmd_t cmd_run(mygdb_t *mygdb) {
 	return CMD_RUN;
 }
 
+// Reload ptrace and waitpid again
 cmd_t cmd_continue(mygdb_t *mygdb) {
 	int status;
 	struct user_regs_struct regs;
@@ -96,6 +100,7 @@ cmd_t cmd_continue(mygdb_t *mygdb) {
 	return CMD_CONTINUE;
 }
 
+// Set breakpoints
 cmd_t cmd_break(mygdb_t *mygdb, int line_num) {
 	Dwarf_Addr addr;
 	if (cmdh_bp_addr(mygdb, line_num, &addr) != 1) {
@@ -120,62 +125,18 @@ cmd_t cmd_break(mygdb_t *mygdb, int line_num) {
 	return CMD_BREAK;
 }
 
-cmd_t cmd_quit() {
+// Quit the program
+cmd_t cmd_quit(mygdb_t *mygdb) {
+	Dwarf_Error err;
+	kill(mygdb->child, SIGKILL);
+	if (dwarf_finish(mygdb->debug, &err) == DW_DLV_ERROR) {
+		printf("Couldn't quit\n%s\n", dwarf_errmsg(err));
+		return CMD_GO;
+	}
 	return CMD_QUIT;
 }
 
-// cmd_t cmd_print(mygdb_t *mygdb, char *var) {
-// 	Dwarf_Half tag;
-// 	Dwarf_Error err;
-// 	Dwarf_Die die;
-// 	Dwarf_Die die_child;
-
-// 	if (cmdh_var_func(mygdb, &die) == RE_FATAL) {
-// 		printf("Couldn't execute cmdh_var_func() in cmd.c\n");
-// 		return CMD_END;
-// 	}
-
-// 	printf("CMD_PRINT\n");
-// 	if (dwarf_tag(die, &tag, &err) != DW_DLV_OK) {
-// 		printf("dwarf_tag() error in cmd.c\n%s\n", dwarf_errmsg(err));
-// 		return CMD_END;
-// 	}
-
-// 	if (tag != DW_TAG_subprogram) {
-// 		printf("Only need to view subprogram DIE.\n");
-// 		return CMD_GO;
-// 	}
-
-// 	if (dwarf_child(die, &die_child, &err) == DW_DLV_ERROR) {
-// 		printf("dwarf_child() error in cmd.c\n%s\n", dwarf_errmsg(err));
-// 		return CMD_END;
-// 	}
-
-
-// 	while (1) {
-// 		int rc, found = 0;
-
-// 		if (cmdh_var_check(die_child, var, &found) == RE_FATAL) {
-// 			printf("cmdh_var_check() error in cmd.c\n");
-// 			return CMD_END;
-// 		}
-
-// 		if (found) {
-// 			return cmdh_var_print(mygdb, die_child, var);
-// 		}
-
-// 		if ((rc = dwarf_siblingof(mygdb->t_dbg, die_child, &die_child, &err)) == DW_DLV_ERROR) {
-// 			printf("Error at dwarf_siblingof() in cmd.c\n%s\n", dwarf_errmsg(err));
-// 			return CMD_END;
-// 		} else if (rc == DW_DLV_NO_ENTRY) {
-// 			printf("Couldn't find the variable.\n");
-// 			return CMD_GO;
-// 		}
-
-// 	}
-// 	return CMD_END;
-// }
-
+// Print the variable 
 cmd_t cmd_print(mygdb_t *mygdb, char *var) {
 	Dwarf_Die fun_die;
 	Dwarf_Die var_die;

@@ -3,7 +3,9 @@
 #include <string.h>
 #include "cmd.h"
 
+// Maximum number of arguments
 #define ARGS_NUM 	2
+// Split between arguments
 #define ARGS_DELIM 	" \n"
 
 char *mygdb_read_line();
@@ -28,10 +30,11 @@ int main(int argc, char const *argv[])
 		status = mygdb_execute(&mygdb, args, args_count);
 
 		int stat;
+		if (status == CMD_QUIT) {
+			return 0;
+		}
 		if (mygdb.child != -1 && (status == CMD_RUN || status == CMD_CONTINUE)) {
-			// printf("HERE 2\n");
 			waitpid(mygdb.child, &stat, 0);
-			// printf("HERE 3\n");
 			if (WIFEXITED(stat) || WIFSIGNALED(stat)) {
 				mygdb.child = -1;
 				mygdb.bps_enabled = -1;
@@ -45,7 +48,6 @@ int main(int argc, char const *argv[])
 				int ii = mygdb.bps_active;
 				printf("Stopped breakpoint #%d (%x) on line %d\n", ii, mygdb.bps[ii].addr, mygdb.bps[ii].line);
 			}
-			// printf("HERE 1\n");
 		}
 		free(line);
 		free(args);
@@ -81,6 +83,7 @@ char **mygdb_parse_args(char *line, int *args_count) {
 }
 
 int mygdb_execute_check(mygdb_t *);
+// Read in arguments and execute command appropriately
 int mygdb_execute(mygdb_t *mygdb, char **args, int args_count) {
 	if (args_count == 0) return 1;
 
@@ -110,7 +113,7 @@ int mygdb_execute(mygdb_t *mygdb, char **args, int args_count) {
 
 	} else if (!strcmp(args[0], EXEC_QUIT)) {
 		if (mygdb_execute_check(mygdb)) return 1;
-		return cmd_quit();
+		return cmd_quit(mygdb);
 	} else if (!strcmp(args[0], EXEC_PRINT)) {
 		if (mygdb_execute_check(mygdb)) return 1;
 		if (args_count != 2) return 1;
