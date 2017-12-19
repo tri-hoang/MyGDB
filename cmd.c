@@ -128,8 +128,8 @@ cmd_t cmd_break(mygdb_t *mygdb, int line_num) {
 // Quit the program
 cmd_t cmd_quit(mygdb_t *mygdb) {
 	Dwarf_Error err;
-	kill(mygdb->child, SIGKILL);
-	if (dwarf_finish(mygdb->debug, &err) == DW_DLV_ERROR) {
+	if (mygdb->child != -1) kill(mygdb->child, SIGKILL);
+	if (mygdb->debug != NULL && (dwarf_finish(mygdb->debug, &err) == DW_DLV_ERROR)) {
 		printf("Couldn't quit\n%s\n", dwarf_errmsg(err));
 		return CMD_GO;
 	}

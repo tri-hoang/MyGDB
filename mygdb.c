@@ -112,13 +112,14 @@ int mygdb_execute(mygdb_t *mygdb, char **args, int args_count) {
 		return cmd_break(mygdb, atoi(args[1]));
 
 	} else if (!strcmp(args[0], EXEC_QUIT)) {
-		if (mygdb_execute_check(mygdb)) return 1;
+		// if (mygdb_execute_check(mygdb)) return 1;
 		return cmd_quit(mygdb);
 	} else if (!strcmp(args[0], EXEC_PRINT)) {
 		if (mygdb_execute_check(mygdb)) return 1;
 		if (args_count != 2) return 1;
 		return cmd_print(mygdb, args[1]);
 	} else {
+		printf("Command unknown\n");
 		return 1;
 	}
 }

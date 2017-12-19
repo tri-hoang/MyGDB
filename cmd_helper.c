@@ -55,7 +55,7 @@ int cmdh_bp_addr(mygdb_t *mygdb, int line_num, Dwarf_Addr *addr) {
 			printf("Failed at dwarf_lineno() in cmd_helper.c\n%s\n", dwarf_errmsg(error));
 			return 0;
 		}
-		if (l_num == line_num) {
+		if (l_num >= line_num) {
 			if (dwarf_lineaddr(linebuf[i], addr, &error) == DW_DLV_ERROR) {
 				printf("Failed at dwarf_lineaddr() in cmd_helper.c\n%s\n", dwarf_errmsg(error));
 			} else break;
